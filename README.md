@@ -1,118 +1,135 @@
 # OpenChamber Nix Flake
 
-A Nix Flake for [OpenChamber](https://github.com/openchamber/openchamber), a web interface and CLI daemon for the OpenCode AI coding agent.
+[![CI](https://github.com/zms-dev/openchamber-flake/actions/workflows/ci.yml/badge.svg)](https://github.com/zms-dev/openchamber-flake/actions/workflows/ci.yml)
+[![Dependency Updates](https://github.com/zms-dev/openchamber-flake/actions/workflows/flake-update.yml/badge.svg)](https://github.com/zms-dev/openchamber-flake/actions/workflows/flake-update.yml)
+[![Cachix Cache](https://img.shields.io/badge/Cachix-openchamber--flake-blue.svg)](https://openchamber-flake.cachix.org)
+[![Nix Built](https://img.shields.io/badge/Nix-Flake-blue.svg?logo=nixos&logoColor=white)](https://nixos.org)
 
-This flake provides:
-* **`openchamber` package**: The OpenChamber web service and CLI wrapped with its runtime dependencies (`bun`, `git`, `openssh`, `cloudflared`, and `opencode`).
-* **NixOS Module**: Declarative configuration and systemd service management.
-* **Home Manager Module**: User-level configuration and user systemd service management.
-* **Options Documentation**: Automatically generated options reference.
+This repository provides a Nix Flake for [**OpenChamber**](https://github.com/openchamber/openchamber) (the web UI and Electron desktop client for the OpenCode AI coding agent), containing the web daemon service, the Electron GUI desktop application package, and fully configurable NixOS and Home Manager service modules.
 
 ---
 
-## Installation & Usage
+## 📚 Documentation
 
-### 1. NixOS Module
+*   [**NixOS Options (`docs/NIXOS_OPTIONS.md`)**](docs/NIXOS_OPTIONS.md): Configuration options for the NixOS system service module.
+*   [**Home Manager Options (`docs/HOME_MANAGER_OPTIONS.md`)**](docs/HOME_MANAGER_OPTIONS.md): Configuration options for the Home Manager user service module.
 
-Add the flake to your inputs in `flake.nix`:
+---
+
+## ✨ Key Features
+
+*   **Stateless Server Packaging**: Bundles and wraps the OpenChamber daemon with its runtime dependencies (`bun`, `git`, `openssh`, `cloudflared`, and `opencode`) directly into the final store path's `PATH`.
+*   **Electron Desktop Client**: Packages the Electron GUI desktop app (`openchamber-desktop`) by compiling assets, bundling the main script, symlinking workspaces for ESM compatibility, and wrapping the standard Nixpkgs `electron` package.
+*   **Fully Managed Declarative Config**: Exposes a structured, typed `settings` schema that automatically generates and manages OpenChamber's `settings.json` at startup, ensuring your Nix configuration is the single source of truth.
+*   **Runtime Password Injection**: Safely loads database/UI authentication secrets at startup via `uiPasswordFile`, avoiding secret leaks in the read-only, world-readable Nix store.
+
+---
+
+## ❄️ Nix Integration
+
+Add OpenChamber to your flake inputs:
 
 ```nix
-inputs = {
-  nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  openchamber-flake.url = "git+https://github.com/openchamber/openchamber-flake"; # Replace with your repo url
-};
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    openchamber-flake.url = "github:zms-dev/openchamber-flake";
+  };
+}
 ```
 
-Then import the NixOS module into your system configuration:
+### NixOS Module
+
+Activate the module and declare daemon settings system-wide:
 
 ```nix
-{ inputs, config, pkgs, ... }: {
-  imports = [
-    inputs.openchamber-flake.nixosModules.openchamber
-  ];
+{ inputs, pkgs, ... }: {
+  imports = [ inputs.openchamber-flake.nixosModules.default ];
 
   services.openchamber = {
     enable = true;
     port = 3000;
     host = "127.0.0.1";
     
-    # Securely supply the UI password
-    uiPasswordFile = "/run/keys/openchamber-password";
+    # Supply UI password securely from a secret file
+    uiPasswordFile = "/run/secrets/openchamber-ui-password";
 
-    # Declarative settings (translates directly to settings.json)
+    # Declaratively manage OpenChamber's settings.json
     settings = {
       themeVariant = "dark";
       darkThemeId = "default";
       desktopLanAccessEnabled = false;
+      showReasoningTraces = true;
     };
   };
 }
 ```
 
-Detailed NixOS options are documented in [docs/NIXOS_OPTIONS.md](./docs/NIXOS_OPTIONS.md).
+### Home Manager Module
 
-### 2. Home Manager Module
-
-Import the Home Manager module in your user environment:
+Declare settings on a per-user level using user systemd services:
 
 ```nix
-{ inputs, config, pkgs, ... }: {
-  imports = [
-    inputs.openchamber-flake.homeManagerModules.openchamber
-  ];
+{ inputs, ... }: {
+  imports = [ inputs.openchamber-flake.homeManagerModules.default ];
 
   services.openchamber = {
     enable = true;
     port = 3001;
     
-    # For Home Manager, dataDir defaults to ~/.config/openchamber
     settings = {
       themeVariant = "dark";
+      mobileKeyboardMode = true;
     };
   };
 }
 ```
 
-Detailed Home Manager options are documented in [docs/HOME_MANAGER_OPTIONS.md](./docs/HOME_MANAGER_OPTIONS.md).
+### Install Desktop Client
+
+Install the Electron GUI desktop application directly into your environment:
+
+```nix
+{ inputs, pkgs, ... }: {
+  environment.systemPackages = [
+    inputs.openchamber-flake.packages.${pkgs.system}.openchamber-desktop
+  ];
+}
+```
 
 ---
 
-## Option Documentation
+## ⚙️ Advanced Customization (Package Overrides)
 
-To re-generate and update the Markdown documentation for the options, run:
+If you want to override the runtime packages or dependencies of the web daemon or desktop application, you can do so using the standard `.override` pattern:
 
+```nix
+environment.systemPackages = [
+  (inputs.openchamber-flake.packages.${pkgs.system}.openchamber-desktop.override {
+    # Use a custom opencode package override
+    opencode = myCustomOpencodePackage;
+  })
+];
+```
+
+---
+
+## 🛠️ Development & Utilities
+
+### Run Integration Tests
+Launch the QEMU VM integrated system check to verify that the systemd service starts, spawns `opencode`, and handles HTTP traffic:
+```bash
+nix flake check -L
+```
+
+### Regenerate Option Reference Manuals
+Rebuild the markdown documentation files from the Nix module schemas:
 ```bash
 nix run .#generate-docs
 ```
 
-This will write the updated documentation directly to:
-* [docs/NIXOS_OPTIONS.md](./docs/NIXOS_OPTIONS.md)
-* [docs/HOME_MANAGER_OPTIONS.md](./docs/HOME_MANAGER_OPTIONS.md)
-
----
-
-## Upgrades and Maintenance
-
-The package configuration is compatible with `nix-update` for fully automated version and hash bumps.
-
-To bump OpenChamber to the latest version, run:
-
+### Automatic Upgrades
+The flake uses `nix-update` for automated weekly lockfile and package updates. To manually trigger a package upgrade, run:
 ```bash
 nix-update openchamber --flake
-```
-
-This command will:
-1. Retrieve the latest release tag from GitHub.
-2. Update the `version` and the source `hash` in `pkgs/openchamber.nix`.
-3. Clear the `npmDepsHash` dependency cache hash and trigger a build to determine the new hash.
-4. Write the final verified hash back to the package definition.
-
----
-
-## Running Integration Tests
-
-To run the NixOS VM integration test locally (requires Linux):
-
-```bash
-nix build .#checks.x86_64-linux.openchamber-integration-test --no-link
 ```
