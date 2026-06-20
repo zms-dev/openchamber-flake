@@ -20,7 +20,7 @@ let
 
   # Dependency builder using Bun fixed-output derivation.
   # The name npmDepsHash is kept so nix-update can automatically update it.
-  npmDepsHash = "sha256-a7XEX+ll7i02l4ZwJGvzaYYOZYNsqrSYSzFKr5nSnj0=";
+  npmDepsHash = "sha256-Y2kH/js023EyMgoMkFDa9S2tjBJdh+r/YsVNdILQGjg=";
 in
 stdenv.mkDerivation {
   pname = "${pname}-node-modules";
@@ -37,20 +37,20 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     export HOME=$TMPDIR
-    bun install --frozen-lockfile --ignore-scripts --backend copyfile --no-progress
+    export BUN_INSTALL_CACHE_DIR=$(mktemp -d)
+
+    bun install \
+      --cpu="*" \
+      --frozen-lockfile \
+      --ignore-scripts \
+      --no-progress \
+      --os="*" \
+      --linker=isolated
   '';
 
   installPhase = ''
     mkdir -p $out
-    cp -r node_modules $out/
-
-    # Copy package-specific node_modules directories for monorepo workspaces
-    for dir in packages/*; do
-      if [ -d "$dir/node_modules" ]; then
-        mkdir -p "$out/$dir"
-        cp -r "$dir/node_modules" "$out/$dir/"
-      fi
-    done
+    find . -type d -name node_modules -exec cp -R --parents {} $out \;
 
     # Clean the final output directory recursively:
     # Clean up temporary C++ compilation files and stray Nix files containing store paths

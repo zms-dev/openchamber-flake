@@ -44,46 +44,46 @@ stdenv.mkDerivation {
   '';
 
   installPhase = ''
-    mkdir -p $out/libexec/openchamber-desktop
+        mkdir -p $out/libexec/openchamber-desktop
 
-    # Copy the package.json, packages, and node_modules folders
-    cp -r package.json packages node_modules $out/libexec/openchamber-desktop/
+        # Copy the package.json, packages, and node_modules folders
+        cp -r package.json packages node_modules $out/libexec/openchamber-desktop/
 
-    # Create symlink for workspace dependency @openchamber/web so that Node.js module resolution
-    # resolves it correctly under the Electron application at runtime.
-    mkdir -p $out/libexec/openchamber-desktop/node_modules/@openchamber
-    ln -s ../../packages/web $out/libexec/openchamber-desktop/node_modules/@openchamber/web
+        # Create symlink for workspace dependency @openchamber/web so that Node.js module resolution
+        # resolves it correctly under the Electron application at runtime.
+        mkdir -p $out/libexec/openchamber-desktop/node_modules/@openchamber
+        ln -s ../../packages/web $out/libexec/openchamber-desktop/node_modules/@openchamber/web
 
-    # Install the desktop icon (using SVG for scalable support)
-    mkdir -p $out/share/icons/hicolor/scalable/apps
-    cp packages/electron/resources/icons/app-icon.svg $out/share/icons/hicolor/scalable/apps/openchamber.svg
+        # Install the desktop icon (using SVG for scalable support)
+        mkdir -p $out/share/icons/hicolor/scalable/apps
+        cp packages/electron/resources/icons/app-icon.svg $out/share/icons/hicolor/scalable/apps/openchamber.svg
 
-    # Install the desktop entry file
-    mkdir -p $out/share/applications
-    cat > $out/share/applications/openchamber.desktop <<EOF
-[Desktop Entry]
-Name=OpenChamber
-Comment=Desktop GUI client for OpenCode AI coding agent
-Exec=openchamber-desktop
-Icon=openchamber
-Type=Application
-Categories=Development;
-Terminal=false
-EOF
+        # Install the desktop entry file
+        mkdir -p $out/share/applications
+        cat > $out/share/applications/openchamber.desktop <<EOF
+    [Desktop Entry]
+    Name=OpenChamber
+    Comment=Desktop GUI client for OpenCode AI coding agent
+    Exec=openchamber-desktop
+    Icon=openchamber
+    Type=Application
+    Categories=Development;
+    Terminal=false
+    EOF
 
-    # Create wrapped executable using standard Electron package pointing to the electron subfolder
-    mkdir -p $out/bin
-    makeWrapper ${electron}/bin/electron $out/bin/openchamber-desktop \
-      --add-flags "$out/libexec/openchamber-desktop/packages/electron" \
-      --prefix PATH : ${
-        lib.makeBinPath [
-          git
-          openssh
-          cloudflared
-          opencode
-        ]
-      } \
-      --set NODE_ENV "production"
+        # Create wrapped executable using standard Electron package pointing to the electron subfolder
+        mkdir -p $out/bin
+        makeWrapper ${electron}/bin/electron $out/bin/openchamber-desktop \
+          --add-flags "$out/libexec/openchamber-desktop/packages/electron" \
+          --prefix PATH : ${
+            lib.makeBinPath [
+              git
+              openssh
+              cloudflared
+              opencode
+            ]
+          } \
+          --set NODE_ENV "production"
   '';
 
   meta = with lib; {
