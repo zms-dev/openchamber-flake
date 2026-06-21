@@ -1,10 +1,7 @@
 {
   lib,
-  stdenv,
+  buildNpmPackage,
   fetchFromGitHub,
-  bun,
-  python3,
-  nix-update-script,
 }:
 
 let
@@ -17,28 +14,33 @@ let
     rev = "v${version}";
     hash = "sha256-9z2fLqpWxdnOztbc8QPiyeAgBMvJFns9kxSVoMg5MpA=";
   };
-
-  # Dependency builder using Bun fixed-output derivation.
-  # The name npmDepsHash is kept so nix-update can automatically update it.
-  npmDepsHash = "sha256-a7XEX+ll7i02l4ZwJGvzaYYOZYNsqrSYSzFKr5nSnj0=";
 in
-stdenv.mkDerivation {
+buildNpmPackage {
   pname = "${pname}-node-modules";
   inherit version src;
 
-  dontFixup = true;
+  postPatch = ''
+    cp ${./package-lock.json} package-lock.json
+    chmod +w package-lock.json
 
-  impureEnvVars = lib.fetchers.proxyImpureEnvVars;
-
-  nativeBuildInputs = [
-    bun
-    python3 # For node-gyp native compiles (node-pty, better-sqlite3)
-  ];
-
-  buildPhase = ''
-    export HOME=$TMPDIR
-    bun install --frozen-lockfile --ignore-scripts --backend copyfile --no-progress
+    # Clean package.json files to make them NPM workspaces compatible
+    sed -i '/"packageManager":/d' package.json
+    sed -i -E 's/"workspace:[^"]*"/"*"/g' package.json
+    for f in packages/*/package.json; do
+      if [ -f "$f" ]; then
+        sed -i -E 's/"workspace:[^"]*"/"*"/g' "$f"
+      fi
+    done
   '';
+
+  # We use a dummy hash first to force Nix to compute the real npmDepsHash for us
+  npmDepsHash = "sha256-SI02udisYeinr2p1hCWgArnptVnuSHWTCJp6JR037n8=";
+
+  makeCacheWritable = true;
+
+  npmFlags = [ "--ignore-scripts" ];
+
+  dontBuild = true;
 
   installPhase = ''
     mkdir -p $out
@@ -52,14 +54,9 @@ stdenv.mkDerivation {
       fi
     done
 
-    # Clean the final output directory recursively:
-    # Clean up temporary C++ compilation files and stray Nix files containing store paths
-    find $out -type f \( -name "*.o" -o -name "*.d" -o -name "*.mk" -o -name "Makefile" -o -name "config.gypi" -o -name "flake.lock" -o -name "flake.nix" -o -name "default.nix" \) -delete
+    # Remove dangling local workspace symlinks to pass Nix sanity checks
+    rm -rf $out/node_modules/@openchamber
+    rm -rf $out/node_modules/openchamber
+    rm -f $out/node_modules/.bin/openchamber
   '';
-
-  outputHash = npmDepsHash;
-  outputHashAlgo = "sha256";
-  outputHashMode = "recursive";
-
-  passthru.updateScript = nix-update-script;
 }
