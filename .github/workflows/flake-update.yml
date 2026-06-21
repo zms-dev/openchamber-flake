@@ -34,7 +34,7 @@ jobs:
         run: nix flake update
 
       - name: Check and update OpenChamber package
-        run: nix run nixpkgs#nix-update -- --flake openchamber
+        run: nix run .#update-package
         continue-on-error: true
 
       - name: Regenerate options documentation

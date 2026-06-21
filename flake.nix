@@ -56,6 +56,23 @@
             ''}";
           };
 
+          apps.update-package = {
+            type = "app";
+            program = "${pkgs.writeShellScript "update-package" ''
+              export PATH="${pkgs.lib.makeBinPath [
+                pkgs.nix
+                pkgs.nix-update
+                pkgs.nodejs
+                pkgs.git
+                pkgs.gnused
+                pkgs.gnugrep
+                pkgs.gawk
+                pkgs.coreutils
+              ]}"
+              ${builtins.readFile ./scripts/update-package.sh}
+            ''}";
+          };
+
           checks = pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
             openchamber-integration-test = pkgs.testers.runNixOSTest {
               name = "openchamber-integration-test";
