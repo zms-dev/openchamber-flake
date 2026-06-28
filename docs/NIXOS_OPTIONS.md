@@ -50,7 +50,7 @@ package
 *Default:*
 
 ```nix
-pkgs.callPackage ../pkgs/openchamber.nix { }
+pkgs.callPackage ../pkgs/openchamber.nix { nodeModules = pkgs.callPackage ../pkgs/node-modules.nix { }; }
 ```
 
 *Declared by:*
