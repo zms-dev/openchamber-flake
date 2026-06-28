@@ -17,8 +17,10 @@ in
 
     package = mkOption {
       type = types.package;
-      default = pkgs.callPackage ../pkgs/openchamber.nix { };
-      defaultText = literalExpression "pkgs.callPackage ../pkgs/openchamber.nix { }";
+      default = pkgs.callPackage ../pkgs/openchamber.nix {
+        nodeModules = pkgs.callPackage ../pkgs/node-modules.nix { };
+      };
+      defaultText = literalExpression "pkgs.callPackage ../pkgs/openchamber.nix { nodeModules = pkgs.callPackage ../pkgs/node-modules.nix { }; }";
       description = "The OpenChamber package to use.";
     };
 
